@@ -3,35 +3,36 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>نظام البركة</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-body{font-family:Tahoma,Arial;background:#f4eee5;color:#493321;margin:0}
+*{box-sizing:border-box}
+body{margin:0;background:#f4eee5;color:#493321;font-family:Tahoma,Arial,sans-serif}
 header{background:#6b4b35;color:white;padding:20px;text-align:center}
 main{max-width:850px;margin:auto;padding:12px}
-.card{background:white;padding:16px;margin:12px 0;border-radius:12px}
+.card{background:white;border-radius:12px;padding:16px;margin:12px 0}
 h2{color:#6b4b35;font-size:19px}
-input,select,button{width:100%;box-sizing:border-box;padding:12px;margin:6px 0;border:1px solid #ddd;border-radius:8px;font-size:15px}
-button{background:#6b4b35;color:white;border:0;font-weight:bold}
+label{display:block;margin-top:10px}
+input,select,button{width:100%;padding:12px;margin-top:7px;border:1px solid #ddd;border-radius:8px;font-size:15px}
+button{background:#6b4b35;color:white;border:0;font-weight:bold;cursor:pointer}
 .secondary{background:#eee5da;color:#493321}
-.hidden{display:none}
-table{width:100%;border-collapse:collapse;font-size:13px}
-td,th{padding:9px;border-bottom:1px solid #ddd;text-align:right}
-.msg{padding:10px;background:#f5f0e9;border-radius:8px;margin-top:8px;white-space:pre-wrap}
+a{color:#805b3b}
+.hidden{display:none!important}
+.msg{padding:10px;background:#f5f0e9;border-radius:8px;margin-top:10px;white-space:pre-wrap}
 .error{background:#ffe9e7;color:#a00}
 nav{display:flex;gap:6px;flex-wrap:wrap}
-nav button{width:auto;flex:1}
+nav button{flex:1}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:9px;border-bottom:1px solid #ddd;text-align:right}
 .small{font-size:12px;color:#777}
 </style>
 </head>
 <body>
-
 <header>
 <h2 style="color:white">نظام البركة</h2>
 <p>إدارة المخزون والمخازن والفروع</p>
 </header>
-
 <main>
 
 <section id="login" class="card">
@@ -41,11 +42,32 @@ nav button{width:auto;flex:1}
 <label>كلمة المرور</label>
 <input id="password" type="password" placeholder="كلمة المرور">
 <button onclick="login()">دخول</button>
+<p style="text-align:center">
+<a href="#" onclick="showRecovery();return false">نسيت كلمة المرور؟</a>
+</p>
 <div id="loginMsg" class="msg">أدخل بيانات حسابك.</div>
 </section>
 
-<section id="application" class="hidden">
+<section id="recovery" class="card hidden">
+<h2>استعادة كلمة المرور</h2>
+<p>أدخل بريدك الإلكتروني لإرسال رابط الاستعادة.</p>
+<input id="recoveryEmail" type="email" placeholder="البريد الإلكتروني">
+<button onclick="sendRecovery()">إرسال رابط الاستعادة</button>
+<button class="secondary" onclick="showLogin()">العودة لتسجيل الدخول</button>
+<div id="recoveryMsg" class="msg"></div>
+</section>
 
+<section id="newPassword" class="card hidden">
+<h2>تعيين كلمة مرور جديدة</h2>
+<label>كلمة المرور الجديدة</label>
+<input id="newPass" type="password" placeholder="8 أحرف على الأقل">
+<label>تأكيد كلمة المرور</label>
+<input id="confirmPass" type="password" placeholder="أعد كتابة كلمة المرور">
+<button onclick="updatePassword()">حفظ كلمة المرور الجديدة</button>
+<div id="newPassMsg" class="msg"></div>
+</section>
+
+<section id="application" class="hidden">
 <div class="card">
 <h3 id="welcome">مرحباً بك</h3>
 <div id="company"></div>
@@ -96,46 +118,86 @@ nav button{width:auto;flex:1}
 <button class="secondary" onclick="loadStock()">تحديث الأرصدة</button>
 <div id="stockList">اضغط تحديث.</div>
 </div>
-
 <div class="card small">
-نسخة أولية قيد الاختبار. يجب التحقق من الصلاحيات واحتساب جميع الحركات قبل اعتماد الأرصدة رسمياً.
+نسخة أولية للاختبار. لا تعتمد الأرصدة رسمياً قبل مراجعة جميع الحركات والصلاحيات.
 </div>
 </section>
 </main>
 
 <script>
-const SUPABASE_URL = "https://ogpvudhotuhthywxrakm.supabase.co";
-const SUPABASE_KEY = "sb_publishable_I4Co1ZEybYARgdWyQae3Gg_164EsQ8h";
+const SUPABASE_URL="https://ogpvudhotuhthywxrakm.supabase.co";
+const SUPABASE_KEY="sb_publishable_I4Co1ZEybYARgdWyQae3Gg_164EsQ8h";
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
-const db = window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let profile=null,products=[],warehouses=[];
+let recoveryMode=false;
 
-let profile = null;
-let products = [];
-let warehouses = [];
-
-function message(text,error=false){
- const el=document.getElementById("message");
- el.textContent=text;
- el.className=error?"msg error":"msg";
+function el(id){return document.getElementById(id)}
+function safe(v){
+ return String(v??"").replace(/[&<>"']/g,c=>({
+ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+ }[c]));
 }
-
-function showTab(tab){
- ["products","movement","stock"].forEach(id=>{
- document.getElementById(id).classList.add("hidden");
- });
- document.getElementById(tab).classList.remove("hidden");
+function message(t,error=false){
+ el("message").textContent=t;
+ el("message").className=error?"msg error":"msg";
+}
+function showOnly(id){
+ ["login","recovery","newPassword","application"].forEach(x=>el(x).classList.add("hidden"));
+ el(id).classList.remove("hidden");
+}
+function showLogin(){showOnly("login")}
+function showRecovery(){
+ el("recoveryEmail").value=el("email").value;
+ el("recoveryMsg").textContent="";
+ showOnly("recovery");
+}
+function showTab(id){
+ ["products","movement","stock"].forEach(x=>el(x).classList.add("hidden"));
+ el(id).classList.remove("hidden");
 }
 
 async function login(){
- const email=document.getElementById("email").value.trim();
- const password=document.getElementById("password").value;
- document.getElementById("loginMsg").textContent="جار التحقق...";
- const {error}=await db.auth.signInWithPassword({email,password});
+ el("loginMsg").textContent="جار التحقق...";
+ const {error}=await db.auth.signInWithPassword({
+  email:el("email").value.trim(),
+  password:el("password").value
+ });
  if(error){
- document.getElementById("loginMsg").textContent="خطأ في الدخول: "+error.message;
- return;
+  el("loginMsg").textContent="تعذر الدخول: "+error.message;
+  el("loginMsg").className="msg error";
+  return;
  }
  await startApp();
+}
+
+async function sendRecovery(){
+ const email=el("recoveryEmail").value.trim();
+ if(!email){el("recoveryMsg").textContent="أدخل البريد الإلكتروني.";return}
+ el("recoveryMsg").textContent="جار إرسال الرابط...";
+ const {error}=await db.auth.resetPasswordForEmail(email,{
+  redirectTo:location.origin
+ });
+ el("recoveryMsg").textContent=error?
+ "تعذر الإرسال: "+error.message:
+ "تم طلب إرسال رابط الاستعادة. تحقق من بريدك الإلكتروني.";
+}
+
+async function updatePassword(){
+ const p=el("newPass").value;
+ const c=el("confirmPass").value;
+ if(p.length<8){el("newPassMsg").textContent="كلمة المرور يجب أن تكون 8 أحرف على الأقل.";return}
+ if(p!==c){el("newPassMsg").textContent="كلمتا المرور غير متطابقتين.";return}
+ el("newPassMsg").textContent="جار حفظ كلمة المرور...";
+ const {error}=await db.auth.updateUser({password:p});
+ if(error){
+  el("newPassMsg").textContent="تعذر تغيير كلمة المرور: "+error.message;
+  return;
+ }
+ recoveryMode=false;
+ el("newPassMsg").textContent="تم تغيير كلمة المرور. يمكنك تسجيل الدخول الآن.";
+ await db.auth.signOut();
+ setTimeout(showLogin,1200);
 }
 
 async function logout(){
@@ -144,205 +206,131 @@ async function logout(){
 }
 
 async function startApp(){
- document.getElementById("login").classList.add("hidden");
- document.getElementById("application").classList.remove("hidden");
-
+ showOnly("application");
  const {data:{user}}=await db.auth.getUser();
-
- const {data,error}=await db
- .from("user_profiles")
- .select("*")
- .eq("user_id",user.id)
- .single();
-
+ if(!user){showLogin();return}
+ const {data,error}=await db.from("user_profiles")
+  .select("*").eq("user_id",user.id).single();
  if(error){
- message("تعذر قراءة بيانات المستخدم: "+error.message,true);
- return;
+  message("تعذر قراءة ملف المستخدم: "+error.message,true);
+  return;
  }
-
  profile=data;
- document.getElementById("welcome").textContent=
- profile.full_name || "مرحباً بك في نظام البركة";
-
- const {data:company}=await db
- .from("companies")
- .select("name")
- .eq("id",profile.company_id)
- .maybeSingle();
-
- document.getElementById("company").textContent=
- company ? company.name : "";
-
+ el("welcome").textContent=profile.full_name||"مرحباً بك";
+ const {data:co}=await db.from("companies")
+  .select("name").eq("id",profile.company_id).maybeSingle();
+ el("company").textContent=co?.name||"";
  await loadData();
 }
 
 async function loadData(){
  const [p,w]=await Promise.all([
- db.from("products")
- .select("*")
- .eq("company_id",profile.company_id)
- .order("name"),
- db.from("warehouses")
- .select("*")
- .eq("company_id",profile.company_id)
- .order("name")
+  db.from("products").select("*").eq("company_id",profile.company_id).order("name"),
+  db.from("warehouses").select("*").eq("company_id",profile.company_id).order("name")
  ]);
-
- if(p.error || w.error){
- message("خطأ في تحميل البيانات: "+
- (p.error?.message || w.error?.message),true);
- return;
+ if(p.error||w.error){
+  message("خطأ في تحميل البيانات: "+(p.error?.message||w.error?.message),true);
+  return;
  }
-
- products=p.data || [];
- warehouses=w.data || [];
-
+ products=p.data||[];
+ warehouses=w.data||[];
  renderProducts();
  fillLists();
- message("تم الاتصال بقاعدة البيانات. عدد المواد: "+
- products.length+" — عدد المخازن: "+warehouses.length);
+ message("اتصال ناجح. المواد: "+products.length+" — المخازن: "+warehouses.length);
 }
 
 function renderProducts(){
- const box=document.getElementById("productList");
- if(!products.length){
- box.textContent="لا توجد مواد مسجلة.";
- return;
- }
-
- box.innerHTML="<table><tr><th>المادة</th><th>الباركود</th><th>الوحدة</th></tr>"+
- products.map(p=>"<tr><td>"+safe(p.name)+
- "</td><td>"+safe(p.barcode||"—")+
- "</td><td>"+safe(p.unit||"—")+"</td></tr>").join("")+
- "</table>";
+ if(!products.length){el("productList").textContent="لا توجد مواد مسجلة.";return}
+ el("productList").innerHTML="<table><tr><th>المادة</th><th>الباركود</th><th>الوحدة</th></tr>"+
+ products.map(p=>"<tr><td>"+safe(p.name)+"</td><td>"+safe(p.barcode||"—")+
+ "</td><td>"+safe(p.unit||"—")+"</td></tr>").join("")+"</table>";
 }
-
-function safe(value){
- return String(value??"").replace(/[&<>"']/g,c=>({
- "&":"&amp;","<":"&lt;",">":"&gt;",
- '"':"&quot;","'":"&#39;"
- }[c]));
-}
-
 function fillLists(){
- document.getElementById("productSelect").innerHTML=
- products.map(p=>"<option value='"+safe(p.id)+"'>"+
- safe(p.name)+"</option>").join("");
-
- document.getElementById("warehouseSelect").innerHTML=
- warehouses.map(w=>"<option value='"+safe(w.id)+"'>"+
- safe(w.name)+"</option>").join("");
+ el("productSelect").innerHTML=products.map(p=>
+  "<option value='"+safe(p.id)+"'>"+safe(p.name)+"</option>").join("");
+ el("warehouseSelect").innerHTML=warehouses.map(w=>
+  "<option value='"+safe(w.id)+"'>"+safe(w.name)+"</option>").join("");
 }
 
 async function addProduct(){
- const name=document.getElementById("pname").value.trim();
-
- if(!name){
- message("يرجى إدخال اسم المادة.",true);
- return;
- }
-
+ const name=el("pname").value.trim();
+ if(!name){message("اكتب اسم المادة أولاً.",true);return}
  const payload={
- company_id:profile.company_id,
- name:name,
- barcode:document.getElementById("pbarcode").value.trim()||null,
- unit:document.getElementById("punit").value.trim()||null,
- minimum_stock:Number(document.getElementById("pmin").value||0)
+  company_id:profile.company_id,
+  name,
+  barcode:el("pbarcode").value.trim()||null,
+  unit:el("punit").value.trim()||null,
+  minimum_stock:Number(el("pmin").value||0)
  };
-
  const {error}=await db.from("products").insert(payload);
-
- if(error){
- message("لم يتم حفظ المادة: "+error.message,true);
- return;
- }
-
- document.getElementById("pname").value="";
- document.getElementById("pbarcode").value="";
- document.getElementById("punit").value="";
- document.getElementById("pmin").value="0";
-
+ if(error){message("لم يتم حفظ المادة: "+error.message,true);return}
+ el("pname").value="";
+ el("pbarcode").value="";
+ el("punit").value="";
+ el("pmin").value="0";
  await loadData();
  message("تم حفظ المادة بنجاح.");
 }
 
 async function saveMovement(){
- const product_id=document.getElementById("productSelect").value;
- const warehouse_id=document.getElementById("warehouseSelect").value;
- const quantity=Number(document.getElementById("quantity").value);
-
- if(!product_id || !warehouse_id || quantity<=0){
- message("اختر المادة والمخزن وأدخل كمية صحيحة.",true);
- return;
+ const product_id=el("productSelect").value;
+ const warehouse_id=el("warehouseSelect").value;
+ const quantity=Number(el("quantity").value);
+ if(!product_id||!warehouse_id||quantity<=0){
+  message("اختر المادة والمخزن وأدخل كمية صحيحة.",true);return;
  }
-
  const {data:{user}}=await db.auth.getUser();
-
  const payload={
- company_id:profile.company_id,
- product_id:product_id,
- warehouse_id:warehouse_id,
- movement_type:document.getElementById("movementType").value,
- quantity:quantity,
- notes:document.getElementById("notes").value.trim()||null,
- user_id:user.id
+  company_id:profile.company_id,
+  product_id,warehouse_id,
+  movement_type:el("movementType").value,
+  quantity,
+  notes:el("notes").value.trim()||null,
+  user_id:user.id
  };
-
  const {error}=await db.from("stock_movements").insert(payload);
-
- if(error){
- message("لم يتم تسجيل الحركة: "+error.message,true);
- return;
- }
-
- document.getElementById("quantity").value="";
- document.getElementById("notes").value="";
- message("تم تسجيل حركة المخزون بنجاح.");
+ if(error){message("تعذر تسجيل الحركة: "+error.message,true);return}
+ el("quantity").value="";
+ el("notes").value="";
+ message("تم تسجيل الحركة.");
 }
 
 async function loadStock(){
- const box=document.getElementById("stockList");
- box.textContent="جار تحميل الحركات...";
-
+ el("stockList").textContent="جار تحميل الحركات...";
  const {data,error}=await db.from("stock_movements")
- .select("product_id,warehouse_id,movement_type,quantity,created_at")
- .eq("company_id",profile.company_id)
- .order("created_at",{ascending:true})
- .limit(1000);
-
- if(error){
- box.textContent="خطأ: "+error.message;
- return;
- }
-
+  .select("product_id,warehouse_id,movement_type,quantity,created_at")
+  .eq("company_id",profile.company_id)
+  .order("created_at",{ascending:true}).limit(1000);
+ if(error){el("stockList").textContent="خطأ: "+error.message;return}
  const totals={};
-
  (data||[]).forEach(m=>{
- const key=m.product_id+"|"+m.warehouse_id;
- if(totals[key]===undefined) totals[key]=0;
- const q=Number(m.quantity)||0;
- totals[key]+=m.movement_type==="out"?-q:q;
+  const k=m.product_id+"|"+m.warehouse_id;
+  if(totals[k]===undefined)totals[k]=0;
+  const q=Number(m.quantity)||0;
+  totals[k]+=m.movement_type==="out"?-q:q;
  });
-
  const pn=Object.fromEntries(products.map(p=>[p.id,p.name]));
  const wn=Object.fromEntries(warehouses.map(w=>[w.id,w.name]));
-
- const rows=Object.entries(totals).map(([key,value])=>{
- const ids=key.split("|");
- return "<tr><td>"+safe(pn[ids[0]]||ids[0])+
- "</td><td>"+safe(wn[ids[1]]||ids[1])+
- "</td><td>"+value.toFixed(3)+"</td></tr>";
+ const rows=Object.entries(totals).map(([k,v])=>{
+  const [p,w]=k.split("|");
+  return "<tr><td>"+safe(pn[p]||p)+"</td><td>"+safe(wn[w]||w)+
+  "</td><td>"+v.toFixed(3)+"</td></tr>";
  });
-
- box.innerHTML=rows.length?
- "<table><tr><th>المادة</th><th>المخزن</th><th>الرصيد</th></tr>"+
- rows.join("")+"</table>"+
- "<p class='small'>ملخص تجريبي لآخر 1000 حركة فقط.</p>":
- "لا توجد حركات مسجلة.";
+ el("stockList").innerHTML=rows.length?
+  "<table><tr><th>المادة</th><th>المخزن</th><th>الرصيد</th></tr>"+rows.join("")+"</table>"+
+  "<p class='small'>ملخص آخر 1000 حركة فقط، وليس رصيداً نهائياً معتمداً.</p>":
+  "لا توجد حركات مخزون.";
 }
 
+db.auth.onAuthStateChange((event,session)=>{
+ if(event==="PASSWORD_RECOVERY"){
+  recoveryMode=true;
+  setTimeout(()=>showOnly("newPassword"),0);
+ }
+});
+
 db.auth.getSession().then(({data})=>{
- if(data.session) startApp();
+ if(data.session && !recoveryMode)startApp();
 });
 </script>
 </body>

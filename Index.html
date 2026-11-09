@@ -1,0 +1,100 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>نظام البركة</title>
+<style>
+body {
+  font-family: Tahoma, Arial, sans-serif;
+  background: #f4eee5;
+  color: #493321;
+  margin: 0;
+  padding: 15px;
+}
+header {
+  background: #6b4b35;
+  color: white;
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+}
+.card {
+  background: white;
+  padding: 16px;
+  margin-top: 15px;
+  border-radius: 12px;
+}
+button {
+  background: #6b4b35;
+  color: white;
+  border: 0;
+  padding: 12px;
+  border-radius: 8px;
+  width: 100%;
+  margin-top: 10px;
+  font-size: 16px;
+}
+input {
+  width: 95%;
+  padding: 10px;
+  margin-top: 8px;
+  border: 1px solid #ddd;
+  border-radius: 7px;
+}
+</style>
+</head>
+<body>
+
+<header>
+<h2>نظام البركة</h2>
+<p>إدارة المخزون والمخازن</p>
+</header>
+
+<div class="card">
+<h3>لوحة الإدارة</h3>
+<p>مرحباً بك في نظام البركة</p>
+</div>
+
+<div class="card">
+<h3>إضافة مادة جديدة</h3>
+<input id="name" placeholder="اسم المادة">
+<input id="code" placeholder="الباركود">
+<input id="unit" placeholder="وحدة القياس">
+<button onclick="addProduct()">إضافة المادة</button>
+</div>
+
+<div class="card">
+<h3>قائمة المواد</h3>
+<div id="products">لا توجد مواد بعد</div>
+</div>
+
+<script>
+function addProduct() {
+  let name = document.getElementById("name").value;
+  let code = document.getElementById("code").value;
+  let unit = document.getElementById("unit").value;
+
+  if (!name) {
+    alert("يرجى إدخال اسم المادة");
+    return;
+  }
+
+  let item = document.createElement("p");
+  item.textContent = name + " | " + code + " | " + unit;
+
+  let list = document.getElementById("products");
+  if (list.textContent === "لا توجد مواد بعد") {
+    list.textContent = "";
+  }
+  list.appendChild(item);
+
+  document.getElementById("name").value = "";
+  document.getElementById("code").value = "";
+  document.getElementById("unit").value = "";
+}
+</script>
+
+</body>
+</html>

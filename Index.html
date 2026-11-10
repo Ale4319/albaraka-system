@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>نظام البركة لإدارة المخزون</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:Tahoma,Arial,sans-serif;background:#f4f5f7;color:#222}
@@ -64,6 +65,46 @@ padding:3px 7px;border-radius:5px;font-weight:bold;font-size:12px;margin-left:6p
 padding:10px;border-radius:7px;margin-top:7px;color:#174c3c;font-size:13px}
 .no-results{padding:12px;color:#777;text-align:center;font-size:13px}
 
+/* تنبيهات المخزون */
+.alert-summary{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+gap:10px;
+margin:12px 0;
+}
+.alert-stat{
+padding:14px;
+border-radius:9px;
+text-align:center;
+background:#f3f5f4;
+}
+.alert-stat strong{
+display:block;
+font-size:25px;
+margin-bottom:5px;
+}
+.alert-stat.out{background:#fbe6e6;color:#a83232}
+.alert-stat.low{background:#fff2dc;color:#a56b16}
+.alert-stat.good{background:#e1f3e7;color:#17664d}
+.alert-table{width:100%;border-collapse:collapse;min-width:650px}
+.alert-table th{background:#edf2ef}
+.alert-out{color:#a83232;font-weight:bold}
+.alert-low{color:#a56b16;font-weight:bold}
+.alert-empty{
+padding:15px;
+background:#e1f3e7;
+color:#17664d;
+border-radius:8px;
+margin:10px 0;
+}
+.alert-heading{
+display:flex;
+justify-content:space-between;
+align-items:center;
+flex-wrap:wrap;
+gap:8px;
+}
+
 @media(max-width:600px){
 main{padding:8px}
 .card{padding:12px}
@@ -71,14 +112,15 @@ main{padding:8px}
 }
 </style>
 </head>
-<body>
 
+<body>
 <header>
 <h1>نظام البركة</h1>
 <div>إدارة المخزون والتحويلات بين المخابز</div>
 </header>
 
 <main>
+
 <section id="loginSection" class="card">
 <h2>تسجيل الدخول</h2>
 <input id="email" type="email" placeholder="البريد الإلكتروني">
@@ -89,6 +131,7 @@ main{padding:8px}
 </section>
 
 <section id="appSection" class="hidden">
+
 <div class="card">
 <div class="row">
 <div>
@@ -107,12 +150,41 @@ main{padding:8px}
 <button onclick="showPage('transfers')">التحويلات</button>
 </div>
 
+<!-- الرئيسية والتنبيهات -->
 <section id="dashboardPage" class="card">
 <h2>لوحة الإدارة</h2>
+
 <div id="dashboardInfo" class="status">مرحباً بك في نظام البركة</div>
+
 <button onclick="refreshAll()">تحديث البيانات</button>
+
+<hr>
+
+<div class="alert-heading">
+<h3>تنبيهات المخزون</h3>
+<button class="secondary" style="max-width:150px"
+onclick="loadLowStockAlerts()">تحديث التنبيهات</button>
+</div>
+
+<div class="alert-summary">
+<div class="alert-stat out">
+<strong id="outStockCount">0</strong>
+نفد المخزون
+</div>
+<div class="alert-stat low">
+<strong id="lowStockCount">0</strong>
+مخزون منخفض
+</div>
+<div class="alert-stat good">
+<strong id="goodStockCount">0</strong>
+مواد دون تنبيه
+</div>
+</div>
+
+<div id="lowStockAlerts">جار تحميل التنبيهات...</div>
 </section>
 
+<!-- المخزون -->
 <section id="stockPage" class="card hidden">
 <h2>أرصدة المخازن</h2>
 <select id="stockWarehouse" onchange="loadStock()"></select>
@@ -120,6 +192,7 @@ main{padding:8px}
 <div class="table-wrap" id="stockTable"></div>
 </section>
 
+<!-- المواد -->
 <section id="productsPage" class="card hidden">
 <h2>إدارة المواد</h2>
 
@@ -157,20 +230,23 @@ main{padding:8px}
 <div class="table-wrap" id="productsTable"></div>
 </section>
 
+<!-- الحركات -->
 <section id="movementsPage" class="card hidden">
 <h2>حركات المخزون</h2>
+
 <div id="movementForm">
 <select id="movementWarehouse"></select>
 
 <label>البحث عن المادة</label>
 <div class="product-search-box">
 <input id="movementProductSearch"
-       placeholder="اكتب اسم المادة أو الباركود أو الرقم الداخلي..."
-       autocomplete="off"
-       oninput="searchProduct('movement')"
-       onfocus="searchProduct('movement')">
+placeholder="اكتب اسم المادة أو الباركود أو الرقم الداخلي..."
+autocomplete="off"
+oninput="searchProduct('movement')"
+onfocus="searchProduct('movement')">
 <div id="movementProductResults" class="search-results hidden"></div>
 </div>
+
 <input type="hidden" id="movementProduct">
 <div id="movementProductSelected"></div>
 
@@ -178,39 +254,47 @@ main{padding:8px}
 <option value="in">إدخال</option>
 <option value="out">إخراج</option>
 </select>
+
 <input id="movementQuantity" type="number" min="0.001" step="0.001" placeholder="الكمية">
 <input id="movementNote" placeholder="ملاحظات">
 <button onclick="addMovement()">حفظ الحركة</button>
 </div>
+
 <div class="table-wrap" id="movementsTable"></div>
 </section>
 
+<!-- التحويلات -->
 <section id="transfersPage" class="card hidden">
 <h2>التحويلات بين المخازن</h2>
 
 <div id="createTransferBox">
 <h3>إنشاء تحويل جديد</h3>
+
 <label>المخزن المصدر</label>
 <select id="transferFrom"></select>
+
 <label>المخزن المستلم</label>
 <select id="transferTo"></select>
 
 <label>البحث عن المادة</label>
 <div class="product-search-box">
 <input id="transferProductSearch"
-       placeholder="اكتب اسم المادة أو الباركود أو الرقم الداخلي..."
-       autocomplete="off"
-       oninput="searchProduct('transfer')"
-       onfocus="searchProduct('transfer')">
+placeholder="اكتب اسم المادة أو الباركود أو الرقم الداخلي..."
+autocomplete="off"
+oninput="searchProduct('transfer')"
+onfocus="searchProduct('transfer')">
 <div id="transferProductResults" class="search-results hidden"></div>
 </div>
+
 <input type="hidden" id="transferProduct">
 <div id="transferProductSelected"></div>
 
 <label>الكمية</label>
 <input id="transferQuantity" type="number" min="0.001" step="0.001" placeholder="الكمية">
+
 <label>ملاحظات</label>
 <input id="transferNotes" placeholder="ملاحظات التحويل">
+
 <button onclick="createTransfer()">إنشاء التحويل</button>
 </div>
 
@@ -227,6 +311,7 @@ main{padding:8px}
 <button class="secondary" onclick="hideReceipt()">إلغاء</button>
 </div>
 </section>
+
 </section>
 </main>
 
@@ -272,20 +357,29 @@ return String(value??'').replace(/[&<>"']/g,c=>({
 /* تسجيل الدخول */
 async function login(){
 msg('loginMessage','جار تسجيل الدخول...');
+
 const {data,error}=await db.auth.signInWithPassword({
 email:$('email').value.trim(),
 password:$('password').value
 });
+
 if(error){msg('loginMessage',error.message);return;}
+
 await startApp(data.user);
 }
 
 async function resetPassword(){
 const email=$('email').value.trim();
-if(!email){msg('loginMessage','أدخل البريد الإلكتروني أولاً');return;}
+
+if(!email){
+msg('loginMessage','أدخل البريد الإلكتروني أولاً');
+return;
+}
+
 const {error}=await db.auth.resetPasswordForEmail(email,{
 redirectTo:location.origin+location.pathname
 });
+
 msg('loginMessage',error?'خطأ: '+error.message:'تم إرسال رابط استرجاع كلمة المرور إلى بريدك الإلكتروني');
 }
 
@@ -302,12 +396,14 @@ if(error||!data){
 msg('loginMessage','تعذر العثور على ملف المستخدم في user_profiles');
 return;
 }
+
 if(data.company_id!==COMPANY_ID){
 msg('loginMessage','هذا الحساب لا ينتمي إلى شركة البركة');
 return;
 }
 
 profile=data;
+
 $('loginSection').classList.add('hidden');
 $('appSection').classList.remove('hidden');
 $('userName').textContent=data.full_name||user.email;
@@ -327,6 +423,7 @@ msg('dashboardInfo','خطأ في تحميل البيانات: '+e.message);
 
 async function loadBaseData(){
 let wq=db.from('warehouses').select('*').eq('company_id',COMPANY_ID);
+
 if(isBranchManager())wq=wq.eq('id',profile.warehouse_id);
 
 const [wr,pr]=await Promise.all([
@@ -345,24 +442,25 @@ fillSelect('stockWarehouse',warehouses);
 fillSelect('movementWarehouse',warehouses);
 fillSelect('transferFrom',warehouses.filter(w=>w.warehouse_type==='central'));
 fillSelect('transferTo',warehouses.filter(w=>w.warehouse_type==='branch'));
+
 fillProductSelects();
 }
 
 function fillSelect(id,items){
 const el=$(id);
 if(!el)return;
+
 el.innerHTML='<option value="">اختر المخزن</option>';
 items.forEach(item=>el.add(new Option(item.name,item.id)));
 }
 
-/* تجهيز قائمة المواد النشطة للبحث */
+/* البحث عن المواد */
 function fillProductSelects(){
 products=products||[];
 clearProductSearch('movement');
 clearProductSearch('transfer');
 }
 
-/* مسح اختيار المادة */
 function clearProductSearch(type){
 const search=$(type+'ProductSearch');
 const hidden=$(type+'Product');
@@ -371,14 +469,15 @@ const selected=$(type+'ProductSelected');
 
 if(search)search.value='';
 if(hidden)hidden.value='';
+
 if(results){
 results.innerHTML='';
 results.classList.add('hidden');
 }
+
 if(selected)selected.innerHTML='';
 }
 
-/* البحث بالاسم أو الباركود أو الرقم الداخلي */
 function searchProduct(type){
 const input=$(type+'ProductSearch');
 const results=$(type+'ProductResults');
@@ -389,7 +488,6 @@ if(!input||!results)return;
 
 const query=input.value.trim().toLowerCase();
 
-/* عند تغيير النص يجب اختيار نتيجة جديدة */
 if(hidden)hidden.value='';
 if(selected)selected.innerHTML='';
 
@@ -406,9 +504,7 @@ const name=String(p.name||'').toLowerCase();
 const barcode=String(p.barcode||'').toLowerCase();
 const code=String(p.product_code??'').toLowerCase();
 
-return name.includes(query)||
-barcode.includes(query)||
-code.includes(query);
+return name.includes(query)||barcode.includes(query)||code.includes(query);
 }).slice(0,30);
 
 if(!matches.length){
@@ -441,9 +537,9 @@ onclick="selectSearchProduct('${type}','${id}')">
 </button>`;
 }
 
-/* اختيار المادة من نتائج البحث */
 function selectSearchProduct(type,id){
 const p=products.find(x=>x.id===id&&x.active!==false);
+
 if(!p)return alert('المادة غير موجودة أو معطلة');
 
 $(type+'Product').value=p.id;
@@ -463,8 +559,16 @@ $(type+'ProductSelected').innerHTML=`
 async function refreshAll(){
 try{
 await loadProducts();
-await Promise.all([loadStock(),loadMovements(),loadTransfers()]);
-msg('dashboardInfo','تم تحديث بيانات النظام');
+
+await Promise.all([
+loadStock(),
+loadMovements(),
+loadTransfers(),
+loadLowStockAlerts()
+]);
+
+msg('dashboardInfo','تم تحديث بيانات النظام والتنبيهات');
+
 }catch(e){
 msg('dashboardInfo','خطأ: '+e.message);
 }
@@ -474,6 +578,7 @@ function showPage(page){
 ['dashboard','stock','products','movements','transfers'].forEach(p=>{
 $(p+'Page').classList.toggle('hidden',p!==page);
 });
+
 if(page==='stock')loadStock();
 if(page==='products')loadProducts();
 if(page==='movements')loadMovements();
@@ -483,7 +588,11 @@ if(page==='transfers')loadTransfers();
 /* أرصدة المخازن */
 async function loadStock(){
 const warehouseId=$('stockWarehouse').value;
-if(!warehouseId){$('stockTable').innerHTML='اختر المخزن';return;}
+
+if(!warehouseId){
+$('stockTable').innerHTML='اختر المخزن';
+return;
+}
 
 const {data,error}=await db.from('stock_movements')
 .select('product_id,movement_type,quantity,created_at')
@@ -492,15 +601,20 @@ const {data,error}=await db.from('stock_movements')
 .order('created_at',{ascending:false})
 .limit(1000);
 
-if(error){$('stockTable').textContent=error.message;return;}
+if(error){
+$('stockTable').textContent=error.message;
+return;
+}
 
 const totals={};
+
 (data||[]).forEach(m=>{
 totals[m.product_id]=(totals[m.product_id]||0)+
 (m.movement_type==='in'?Number(m.quantity):-Number(m.quantity));
 });
 
 let html='<table><thead><tr><th>الرقم</th><th>المادة</th><th>الرصيد</th><th>الحالة</th></tr></thead><tbody>';
+
 products.forEach(p=>{
 html+=`<tr>
 <td>${escapeHTML(p.product_code??'—')}</td>
@@ -509,8 +623,157 @@ html+=`<tr>
 <td>${p.active===false?'معطلة':'نشطة'}</td>
 </tr>`;
 });
+
 html+='</tbody></table>';
 $('stockTable').innerHTML=html;
+}
+
+/* تنبيهات نقص المخزون */
+async function loadLowStockAlerts(){
+const box=$('lowStockAlerts');
+if(!box)return;
+
+box.innerHTML='جار حساب أرصدة المواد وفحص الحدود الدنيا...';
+
+try{
+
+if(!warehouses.length){
+box.innerHTML='لا توجد مخازن متاحة لهذا الحساب';
+return;
+}
+
+const activeProducts=products.filter(p=>p.active!==false);
+
+if(!activeProducts.length){
+box.innerHTML='لا توجد مواد نشطة';
+return;
+}
+
+const totals={};
+const warehouseIds=warehouses.map(w=>w.id);
+
+let start=0;
+const pageSize=1000;
+
+while(true){
+
+const {data,error}=await db.from('stock_movements')
+.select('warehouse_id,product_id,movement_type,quantity')
+.eq('company_id',COMPANY_ID)
+.in('warehouse_id',warehouseIds)
+.range(start,start+pageSize-1);
+
+if(error)throw error;
+
+const rows=data||[];
+
+rows.forEach(m=>{
+const key=m.warehouse_id+'_'+m.product_id;
+
+if(!totals[key])totals[key]=0;
+
+const quantity=Number(m.quantity||0);
+
+if(m.movement_type==='in'){
+totals[key]+=quantity;
+}else if(m.movement_type==='out'){
+totals[key]-=quantity;
+}
+});
+
+if(rows.length<pageSize)break;
+
+start+=pageSize;
+}
+
+const outAlerts=[];
+const lowAlerts=[];
+let goodCount=0;
+
+warehouses.forEach(w=>{
+activeProducts.forEach(p=>{
+
+const key=w.id+'_'+p.id;
+const quantity=totals[key]||0;
+const minimum=Number(p.minimum_stock||0);
+
+const item={
+warehouse:w.name,
+product:p.name,
+code:p.product_code??'—',
+quantity,
+minimum,
+unit:p.unit||''
+};
+
+if(quantity<=0){
+outAlerts.push(item);
+}else if(minimum>0&&quantity<=minimum){
+lowAlerts.push(item);
+}else{
+goodCount++;
+}
+
+});
+});
+
+$('outStockCount').textContent=outAlerts.length;
+$('lowStockCount').textContent=lowAlerts.length;
+$('goodStockCount').textContent=goodCount;
+
+const allAlerts=[
+...outAlerts.map(x=>({...x,status:'نفد المخزون',className:'alert-out'})),
+...lowAlerts.map(x=>({...x,status:'مخزون منخفض',className:'alert-low'}))
+];
+
+if(!allAlerts.length){
+box.innerHTML=`
+<div class="alert-empty">
+✓ ممتاز! لا توجد مواد نفد مخزونها أو وصلت إلى الحد الأدنى.
+</div>`;
+return;
+}
+
+let html=`
+<div class="table-wrap">
+<table class="alert-table">
+<thead>
+<tr>
+<th>المخزن</th>
+<th>رقم المادة</th>
+<th>المادة</th>
+<th>الرصيد الحالي</th>
+<th>الحد الأدنى</th>
+<th>الحالة</th>
+</tr>
+</thead>
+<tbody>`;
+
+allAlerts.forEach(item=>{
+html+=`
+<tr>
+<td>${escapeHTML(item.warehouse)}</td>
+<td><strong>${escapeHTML(item.code)}</strong></td>
+<td>${escapeHTML(item.product)}</td>
+<td>${moneyNumber(item.quantity)} ${escapeHTML(item.unit)}</td>
+<td>${moneyNumber(item.minimum)} ${escapeHTML(item.unit)}</td>
+<td class="${item.className}">${item.status}</td>
+</tr>`;
+});
+
+html+='</tbody></table></div>';
+
+box.innerHTML=html;
+
+}catch(error){
+
+box.innerHTML=`
+<div class="status">
+تعذر تحميل التنبيهات: ${escapeHTML(error.message)}
+</div>`;
+
+console.error('Low stock alerts error:',error);
+}
 }
 
 /* إدارة المواد */
@@ -590,6 +853,8 @@ $('newProductMinimum').value='';
 
 await loadProducts();
 await loadStock();
+await loadLowStockAlerts();
+
 alert('تمت إضافة المادة بنجاح');
 }
 
@@ -640,10 +905,13 @@ minimum_stock:minimum
 if(error)return alert('تعذر تعديل المادة: '+error.message);
 
 cancelProductEdit();
+
 await loadProducts();
 await loadMovements();
 await loadTransfers();
 await loadStock();
+await loadLowStockAlerts();
+
 alert('تم حفظ تعديلات المادة بنجاح');
 }
 
@@ -657,6 +925,7 @@ const ok=confirm(
 'هل تريد تعطيل المادة: '+p.name+'؟\n\n'+
 'لن تظهر المادة في الحركات والتحويلات الجديدة، ولن يتم حذف سجلها القديم.'
 );
+
 if(!ok)return;
 
 const {error}=await db.from('products')
@@ -668,6 +937,8 @@ if(error)return alert('تعذر تعطيل المادة: '+error.message);
 
 await loadProducts();
 await loadStock();
+await loadLowStockAlerts();
+
 alert('تم تعطيل المادة. بقي سجلها السابق محفوظاً.');
 }
 
@@ -687,6 +958,8 @@ const {error}=await db.from('products')
 if(error)return alert('تعذرت إعادة تفعيل المادة: '+error.message);
 
 await loadProducts();
+await loadLowStockAlerts();
+
 alert('تمت إعادة تفعيل المادة بنجاح');
 }
 
@@ -699,7 +972,11 @@ let q=db.from('stock_movements').select('*')
 if(isBranchManager())q=q.eq('warehouse_id',profile.warehouse_id);
 
 const {data,error}=await q;
-if(error){$('movementsTable').textContent=error.message;return;}
+
+if(error){
+$('movementsTable').textContent=error.message;
+return;
+}
 
 movements=data||[];
 
@@ -707,6 +984,7 @@ let html='<table><thead><tr><th>التاريخ</th><th>المادة</th><th>ال
 
 movements.forEach(m=>{
 const p=products.find(x=>x.id===m.product_id);
+
 html+=`<tr>
 <td>${m.created_at?new Date(m.created_at).toLocaleString('ar-TN'):''}</td>
 <td>${escapeHTML(p?.name||'مادة غير موجودة')}</td>
@@ -729,10 +1007,12 @@ const type=$('movementType').value;
 if(!warehouseId||!productId||quantity<=0)return alert('تحقق من البيانات');
 
 const product=products.find(p=>p.id===productId);
+
 if(!product||product.active===false)return alert('هذه المادة غير نشطة');
 
 const {data:userData}=await db.auth.getUser();
 const user=userData.user;
+
 if(!user)return alert('انتهت جلسة الدخول');
 
 const {error}=await db.from('stock_movements').insert({
@@ -753,7 +1033,9 @@ clearProductSearch('movement');
 
 await loadMovements();
 await loadStock();
-alert('تم تسجيل الحركة');
+await loadLowStockAlerts();
+
+alert('تم تسجيل الحركة وتحديث التنبيهات');
 }
 
 /* إنشاء التحويل */
@@ -769,10 +1051,12 @@ if(!from||!to||!product||quantity<=0)return alert('أكمل بيانات الت�
 if(from===to)return alert('لا يمكن التحويل إلى المخزن نفسه');
 
 const selectedProduct=products.find(p=>p.id===product);
+
 if(!selectedProduct||selectedProduct.active===false)return alert('المادة غير نشطة');
 
 const {data:userData}=await db.auth.getUser();
 const user=userData.user;
+
 if(!user)return alert('انتهت جلسة الدخول');
 
 const {data:transfer,error:transferError}=await db.from('stock_transfers')
@@ -803,6 +1087,7 @@ $('transferNotes').value='';
 clearProductSearch('transfer');
 
 await loadTransfers();
+
 alert('تم إنشاء مسودة التحويل. اضغط إرسال بعد مراجعتها.');
 }
 
@@ -812,7 +1097,10 @@ const {data,error}=await db.from('stock_transfers')
 .select('*').eq('company_id',COMPANY_ID)
 .order('created_at',{ascending:false}).limit(100);
 
-if(error){$('transfersTable').textContent=error.message;return;}
+if(error){
+$('transfersTable').textContent=error.message;
+return;
+}
 
 transfers=data||[];
 const ids=transfers.map(t=>t.id);
@@ -821,19 +1109,27 @@ transferItems=[];
 if(ids.length){
 const r=await db.from('stock_transfer_items')
 .select('*').in('transfer_id',ids);
-if(r.error){$('transfersTable').textContent=r.error.message;return;}
+
+if(r.error){
+$('transfersTable').textContent=r.error.message;
+return;
+}
+
 transferItems=r.data||[];
 }
 
 let html='<table><thead><tr><th>رقم</th><th>الحالة</th><th>التفاصيل</th><th>الإجراء</th></tr></thead><tbody>';
 
 for(const t of transfers){
+
 const from=warehouses.find(w=>w.id===t.from_warehouse_id)?.name||'';
 const to=warehouses.find(w=>w.id===t.to_warehouse_id)?.name||'';
+
 const items=transferItems.filter(i=>i.transfer_id===t.id);
 
 const details=items.map(i=>{
 const p=products.find(x=>x.id===i.product_id);
+
 return `${escapeHTML(p?.name||'مادة')}: ${moneyNumber(i.sent_quantity)} (مستلم ${moneyNumber(i.received_quantity)})`;
 }).join('<br>');
 
@@ -861,14 +1157,18 @@ $('transfersTable').innerHTML=html+'</tbody></table>';
 
 async function sendTransfer(id){
 if(!canManageTransfers())return alert('ليس لديك صلاحية');
+
 if(!confirm('هل تريد إرسال هذا التحويل وخصم الكمية من المخزن المركزي؟'))return;
 
 const {error}=await db.rpc('send_stock_transfer',{p_transfer_id:id});
+
 if(error)return alert(error.message);
 
 await loadTransfers();
 await loadStock();
-alert('تم إرسال التحويل');
+await loadLowStockAlerts();
+
+alert('تم إرسال التحويل وتحديث التنبيهات');
 }
 
 function openTransferReceipt(transferId){
@@ -913,16 +1213,20 @@ p_notes:notes
 if(error)return alert(error.message);
 
 hideReceipt();
+
 await loadTransfers();
 await loadMovements();
 await loadStock();
-alert('تم تسجيل الاستلام');
+await loadLowStockAlerts();
+
+alert('تم تسجيل الاستلام وتحديث التنبيهات');
 }
 
 async function finalizeTransfer(id){
 if(!confirm('هل تؤكد إغلاق التحويل نهائياً؟ سيتم تثبيت الكميات والفروقات.'))return;
 
 const {error}=await db.rpc('finalize_transfer_receipt',{p_transfer_id:id});
+
 if(error)return alert(error.message);
 
 await loadTransfers();
@@ -937,6 +1241,7 @@ if(data.session)await startApp(data.session.user);
 db.auth.onAuthStateChange(async(event,session)=>{
 if(event==='PASSWORD_RECOVERY'){
 const newPassword=prompt('أدخل كلمة المرور الجديدة');
+
 if(newPassword){
 const {error}=await db.auth.updateUser({password:newPassword});
 alert(error?error.message:'تم تغيير كلمة المرور');

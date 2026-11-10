@@ -27,7 +27,7 @@ button:disabled{opacity:.5}
 .hidden{display:none!important}
 .muted{color:#777;font-size:13px}
 .status{padding:10px;border-radius:7px;background:#eef5f0;margin:8px 0}
-table{width:100%;border-collapse:collapse;margin-top:10px;background:white;min-width:500px}
+table{width:100%;border-collapse:collapse;margin-top:10px;background:white;min-width:600px}
 th,td{padding:10px;border-bottom:1px solid #ddd;text-align:right}
 th{background:#edf2ef}
 .table-wrap{overflow-x:auto}
@@ -39,6 +39,31 @@ th{background:#edf2ef}
 .active-badge{background:#e1f3e7;color:#17664d}
 .inactive-badge{background:#fbe6e6;color:#a83232}
 .edit-box{background:#f5f7f5;border:1px solid #dce5df;padding:14px;border-radius:10px;margin:12px 0}
+
+/* البحث عن المواد */
+.product-search-box{position:relative;margin:8px 0}
+.product-search-box input{margin:0;border:2px solid #cbd8d0}
+.product-search-box input:focus{outline:none;border-color:#17664d}
+.search-hint{font-size:12px;color:#777;margin:5px 2px}
+.search-results{
+position:absolute;top:100%;right:0;left:0;z-index:1000;
+background:white;border:1px solid #cbd8d0;border-radius:8px;
+box-shadow:0 5px 15px #0002;max-height:280px;overflow-y:auto;
+}
+.search-result{
+padding:12px;border-bottom:1px solid #eee;cursor:pointer;
+background:white;color:#222;margin:0;border-radius:0;
+text-align:right;width:100%;
+}
+.search-result:hover{background:#edf5ef}
+.search-result:last-child{border-bottom:0}
+.result-code{display:inline-block;background:#e1f3e7;color:#17664d;
+padding:3px 7px;border-radius:5px;font-weight:bold;font-size:12px;margin-left:6px}
+.result-details{font-size:12px;color:#777;margin-top:5px}
+.selected-product{background:#eaf5ed;border:1px solid #b8d7c1;
+padding:10px;border-radius:7px;margin-top:7px;color:#174c3c;font-size:13px}
+.no-results{padding:12px;color:#777;text-align:center;font-size:13px}
+
 @media(max-width:600px){
 main{padding:8px}
 .card{padding:12px}
@@ -136,7 +161,19 @@ main{padding:8px}
 <h2>حركات المخزون</h2>
 <div id="movementForm">
 <select id="movementWarehouse"></select>
-<select id="movementProduct"></select>
+
+<label>البحث عن المادة</label>
+<div class="product-search-box">
+<input id="movementProductSearch"
+       placeholder="اكتب اسم المادة أو الباركود أو الرقم الداخلي..."
+       autocomplete="off"
+       oninput="searchProduct('movement')"
+       onfocus="searchProduct('movement')">
+<div id="movementProductResults" class="search-results hidden"></div>
+</div>
+<input type="hidden" id="movementProduct">
+<div id="movementProductSelected"></div>
+
 <select id="movementType">
 <option value="in">إدخال</option>
 <option value="out">إخراج</option>
@@ -157,8 +194,19 @@ main{padding:8px}
 <select id="transferFrom"></select>
 <label>المخزن المستلم</label>
 <select id="transferTo"></select>
-<label>المادة</label>
-<select id="transferProduct"></select>
+
+<label>البحث عن المادة</label>
+<div class="product-search-box">
+<input id="transferProductSearch"
+       placeholder="اكتب اسم المادة أو الباركود أو الرقم الداخلي..."
+       autocomplete="off"
+       oninput="searchProduct('transfer')"
+       onfocus="searchProduct('transfer')">
+<div id="transferProductResults" class="search-results hidden"></div>
+</div>
+<input type="hidden" id="transferProduct">
+<div id="transferProductSelected"></div>
+
 <label>الكمية</label>
 <input id="transferQuantity" type="number" min="0.001" step="0.001" placeholder="الكمية">
 <label>ملاحظات</label>
@@ -221,6 +269,7 @@ return String(value??'').replace(/[&<>"']/g,c=>({
 })[c]);
 }
 
+/* تسجيل الدخول */
 async function login(){
 msg('loginMessage','جار تسجيل الدخول...');
 const {data,error}=await db.auth.signInWithPassword({
@@ -306,16 +355,111 @@ el.innerHTML='<option value="">اختر المخزن</option>';
 items.forEach(item=>el.add(new Option(item.name,item.id)));
 }
 
+/* تجهيز قائمة المواد النشطة للبحث */
 function fillProductSelects(){
-const activeProducts=products.filter(p=>p.active===true);
-['movementProduct','transferProduct'].forEach(id=>{
-const el=$(id);
-if(!el)return;
-el.innerHTML='<option value="">اختر المادة</option>';
-activeProducts.forEach(p=>el.add(new Option(p.name,p.id)));
-});
+products=products||[];
+clearProductSearch('movement');
+clearProductSearch('transfer');
 }
 
+/* مسح اختيار المادة */
+function clearProductSearch(type){
+const search=$(type+'ProductSearch');
+const hidden=$(type+'Product');
+const results=$(type+'ProductResults');
+const selected=$(type+'ProductSelected');
+
+if(search)search.value='';
+if(hidden)hidden.value='';
+if(results){
+results.innerHTML='';
+results.classList.add('hidden');
+}
+if(selected)selected.innerHTML='';
+}
+
+/* البحث بالاسم أو الباركود أو الرقم الداخلي */
+function searchProduct(type){
+const input=$(type+'ProductSearch');
+const results=$(type+'ProductResults');
+const hidden=$(type+'Product');
+const selected=$(type+'ProductSelected');
+
+if(!input||!results)return;
+
+const query=input.value.trim().toLowerCase();
+
+/* عند تغيير النص يجب اختيار نتيجة جديدة */
+if(hidden)hidden.value='';
+if(selected)selected.innerHTML='';
+
+const activeProducts=products.filter(p=>p.active!==false);
+
+if(!query){
+results.innerHTML=activeProducts.slice(0,30).map(p=>productResultHTML(p,type)).join('');
+results.classList.remove('hidden');
+return;
+}
+
+const matches=activeProducts.filter(p=>{
+const name=String(p.name||'').toLowerCase();
+const barcode=String(p.barcode||'').toLowerCase();
+const code=String(p.product_code??'').toLowerCase();
+
+return name.includes(query)||
+barcode.includes(query)||
+code.includes(query);
+}).slice(0,30);
+
+if(!matches.length){
+results.innerHTML='<div class="no-results">لا توجد مادة مطابقة للبحث</div>';
+results.classList.remove('hidden');
+return;
+}
+
+results.innerHTML=matches.map(p=>productResultHTML(p,type)).join('');
+results.classList.remove('hidden');
+}
+
+function productResultHTML(p,type){
+const id=escapeHTML(p.id);
+const code=escapeHTML(p.product_code??'—');
+const name=escapeHTML(p.name);
+const barcode=escapeHTML(p.barcode||'غير متوفر');
+const unit=escapeHTML(p.unit||'');
+
+return `
+<button type="button" class="search-result"
+onclick="selectSearchProduct('${type}','${id}')">
+<div>
+<span class="result-code">${code}</span>
+<strong>${name}</strong>
+</div>
+<div class="result-details">
+الباركود: ${barcode} ${unit?' | الوحدة: '+unit:''}
+</div>
+</button>`;
+}
+
+/* اختيار المادة من نتائج البحث */
+function selectSearchProduct(type,id){
+const p=products.find(x=>x.id===id&&x.active!==false);
+if(!p)return alert('المادة غير موجودة أو معطلة');
+
+$(type+'Product').value=p.id;
+$(type+'ProductSearch').value=p.name;
+$(type+'ProductResults').classList.add('hidden');
+
+$(type+'ProductSelected').innerHTML=`
+<div class="selected-product">
+<strong>المادة المختارة:</strong> ${escapeHTML(p.name)}
+<br>
+الرقم الداخلي: ${escapeHTML(p.product_code??'—')}
+ | الوحدة: ${escapeHTML(p.unit||'غير محددة')}
+</div>`;
+}
+
+/* تحديث النظام */
 async function refreshAll(){
 try{
 await loadProducts();
@@ -336,6 +480,7 @@ if(page==='movements')loadMovements();
 if(page==='transfers')loadTransfers();
 }
 
+/* أرصدة المخازن */
 async function loadStock(){
 const warehouseId=$('stockWarehouse').value;
 if(!warehouseId){$('stockTable').innerHTML='اختر المخزن';return;}
@@ -355,9 +500,10 @@ totals[m.product_id]=(totals[m.product_id]||0)+
 (m.movement_type==='in'?Number(m.quantity):-Number(m.quantity));
 });
 
-let html='<table><thead><tr><th>المادة</th><th>الرصيد</th><th>الحالة</th></tr></thead><tbody>';
+let html='<table><thead><tr><th>الرقم</th><th>المادة</th><th>الرصيد</th><th>الحالة</th></tr></thead><tbody>';
 products.forEach(p=>{
 html+=`<tr>
+<td>${escapeHTML(p.product_code??'—')}</td>
 <td>${escapeHTML(p.name)}</td>
 <td>${moneyNumber(totals[p.id]||0)}</td>
 <td>${p.active===false?'معطلة':'نشطة'}</td>
@@ -367,9 +513,10 @@ html+='</tbody></table>';
 $('stockTable').innerHTML=html;
 }
 
+/* إدارة المواد */
 async function loadProducts(){
 const {data,error}=await db.from('products')
-.select('*').eq('company_id',COMPANY_ID).order('name');
+.select('*').eq('company_id',COMPANY_ID).order('product_code');
 
 if(error){
 $('productsTable').textContent=error.message;
@@ -380,7 +527,7 @@ products=data||[];
 fillProductSelects();
 
 let html='<table><thead><tr>'+
-'<th>المادة</th><th>الوحدة</th><th>الباركود</th>'+
+'<th>الرقم الداخلي</th><th>المادة</th><th>الوحدة</th><th>الباركود</th>'+
 '<th>الصنف</th><th>الحد الأدنى</th><th>الحالة</th><th>الإجراءات</th>'+
 '</tr></thead><tbody>';
 
@@ -399,6 +546,7 @@ ${active?
 }
 
 html+=`<tr>
+<td><strong>${escapeHTML(p.product_code??'—')}</strong></td>
 <td>${escapeHTML(p.name)}</td>
 <td>${escapeHTML(p.unit||'')}</td>
 <td>${escapeHTML(p.barcode||'')}</td>
@@ -542,6 +690,7 @@ await loadProducts();
 alert('تمت إعادة تفعيل المادة بنجاح');
 }
 
+/* الحركات */
 async function loadMovements(){
 let q=db.from('stock_movements').select('*')
 .eq('company_id',COMPANY_ID)
@@ -600,11 +749,14 @@ if(error)return alert(error.message);
 
 $('movementQuantity').value='';
 $('movementNote').value='';
+clearProductSearch('movement');
+
 await loadMovements();
 await loadStock();
 alert('تم تسجيل الحركة');
 }
 
+/* إنشاء التحويل */
 async function createTransfer(){
 if(!canManageTransfers())return alert('ليس لديك صلاحية إنشاء تحويل');
 
@@ -648,10 +800,13 @@ return;
 
 $('transferQuantity').value='';
 $('transferNotes').value='';
+clearProductSearch('transfer');
+
 await loadTransfers();
 alert('تم إنشاء مسودة التحويل. اضغط إرسال بعد مراجعتها.');
 }
 
+/* عرض التحويلات */
 async function loadTransfers(){
 const {data,error}=await db.from('stock_transfers')
 .select('*').eq('company_id',COMPANY_ID)
@@ -774,6 +929,7 @@ await loadTransfers();
 alert('تم إغلاق التحويل');
 }
 
+/* استعادة الجلسة */
 db.auth.getSession().then(async({data})=>{
 if(data.session)await startApp(data.session.user);
 });

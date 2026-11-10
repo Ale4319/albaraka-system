@@ -1,336 +1,574 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>نظام البركة</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<style>
-*{box-sizing:border-box}
-body{margin:0;background:#f4eee5;color:#493321;font-family:Tahoma,Arial,sans-serif}
-header{background:#6b4b35;color:white;padding:20px;text-align:center}
-main{max-width:850px;margin:auto;padding:12px}
-.card{background:white;border-radius:12px;padding:16px;margin:12px 0}
-h2{color:#6b4b35;font-size:19px}
-label{display:block;margin-top:10px}
-input,select,button{width:100%;padding:12px;margin-top:7px;border:1px solid #ddd;border-radius:8px;font-size:15px}
-button{background:#6b4b35;color:white;border:0;font-weight:bold;cursor:pointer}
-.secondary{background:#eee5da;color:#493321}
-a{color:#805b3b}
-.hidden{display:none!important}
-.msg{padding:10px;background:#f5f0e9;border-radius:8px;margin-top:10px;white-space:pre-wrap}
-.error{background:#ffe9e7;color:#a00}
-nav{display:flex;gap:6px;flex-wrap:wrap}
-nav button{flex:1}
-table{width:100%;border-collapse:collapse;font-size:13px}
-td,th{padding:9px;border-bottom:1px solid #ddd;text-align:right}
-.small{font-size:12px;color:#777}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>نظام البركة لإدارة المخزون</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Tahoma,Arial,sans-serif;background:#f4f5f7;color:#222}
+    header{background:#174c3c;color:white;padding:16px;text-align:center}
+    main{max-width:1100px;margin:auto;padding:15px}
+    .card{background:white;padding:16px;border-radius:12px;margin:12px 0;box-shadow:0 2px 8px #0001}
+    h2{font-size:19px;color:#174c3c}
+    input,select,textarea,button{font:inherit;padding:11px;border-radius:7px;border:1px solid #ccc;width:100%;margin:5px 0}
+    button{background:#17664d;color:white;border:0;cursor:pointer}
+    button.secondary{background:#555}
+    button.danger{background:#a83232}
+    button:disabled{opacity:.5}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+    .tabs{display:flex;gap:6px;flex-wrap:wrap}
+    .tabs button{width:auto;flex:1;min-width:100px}
+    .hidden{display:none!important}
+    .muted{color:#777;font-size:13px}
+    .status{padding:10px;border-radius:7px;background:#eef5f0;margin:8px 0}
+    table{width:100%;border-collapse:collapse;margin-top:10px;background:white}
+    th,td{padding:10px;border-bottom:1px solid #ddd;text-align:right}
+    th{background:#edf2ef}
+    .table-wrap{overflow-x:auto}
+    .row{display:flex;gap:8px;align-items:center}
+    .row>*{flex:1}
+    @media(max-width:600px){main{padding:8px}.card{padding:12px}}
+  </style>
 </head>
 <body>
+
 <header>
-<h2 style="color:white">نظام البركة</h2>
-<p>إدارة المخزون والمخازن والفروع</p>
+  <h1>نظام البركة</h1>
+  <div>إدارة المخزون والتحويلات بين المخابز</div>
 </header>
+
 <main>
+  <section id="loginSection" class="card">
+    <h2>تسجيل الدخول</h2>
+    <input id="email" type="email" placeholder="البريد الإلكتروني">
+    <input id="password" type="password" placeholder="كلمة المرور">
+    <button onclick="login()">دخول</button>
+    <button class="secondary" onclick="resetPassword()">نسيت كلمة المرور؟</button>
+    <div id="loginMessage" class="status"></div>
+  </section>
 
-<section id="login" class="card">
-<h2>تسجيل الدخول</h2>
-<label>البريد الإلكتروني</label>
-<input id="email" type="email" placeholder="البريد الإلكتروني">
-<label>كلمة المرور</label>
-<input id="password" type="password" placeholder="كلمة المرور">
-<button onclick="login()">دخول</button>
-<p style="text-align:center">
-<a href="#" onclick="showRecovery();return false">نسيت كلمة المرور؟</a>
-</p>
-<div id="loginMsg" class="msg">أدخل بيانات حسابك.</div>
-</section>
+  <section id="appSection" class="hidden">
+    <div class="card">
+      <div class="row">
+        <div>
+          <strong id="userName">المستخدم</strong>
+          <div class="muted" id="userRole"></div>
+        </div>
+        <button class="danger" style="max-width:110px" onclick="logout()">خروج</button>
+      </div>
+    </div>
 
-<section id="recovery" class="card hidden">
-<h2>استعادة كلمة المرور</h2>
-<p>أدخل بريدك الإلكتروني لإرسال رابط الاستعادة.</p>
-<input id="recoveryEmail" type="email" placeholder="البريد الإلكتروني">
-<button onclick="sendRecovery()">إرسال رابط الاستعادة</button>
-<button class="secondary" onclick="showLogin()">العودة لتسجيل الدخول</button>
-<div id="recoveryMsg" class="msg"></div>
-</section>
+    <div class="tabs">
+      <button onclick="showPage('dashboard')">الرئيسية</button>
+      <button onclick="showPage('stock')">المخزون</button>
+      <button onclick="showPage('products')">المواد</button>
+      <button onclick="showPage('movements')">الحركات</button>
+      <button onclick="showPage('transfers')">التحويلات</button>
+    </div>
 
-<section id="newPassword" class="card hidden">
-<h2>تعيين كلمة مرور جديدة</h2>
-<label>كلمة المرور الجديدة</label>
-<input id="newPass" type="password" placeholder="8 أحرف على الأقل">
-<label>تأكيد كلمة المرور</label>
-<input id="confirmPass" type="password" placeholder="أعد كتابة كلمة المرور">
-<button onclick="updatePassword()">حفظ كلمة المرور الجديدة</button>
-<div id="newPassMsg" class="msg"></div>
-</section>
+    <section id="dashboardPage" class="card">
+      <h2>لوحة الإدارة</h2>
+      <div id="dashboardInfo" class="status">مرحباً بك في نظام البركة</div>
+      <button onclick="refreshAll()">تحديث البيانات</button>
+    </section>
 
-<section id="application" class="hidden">
-<div class="card">
-<h3 id="welcome">مرحباً بك</h3>
-<div id="company"></div>
-<button class="secondary" onclick="logout()">تسجيل الخروج</button>
-<nav>
-<button onclick="showTab('products')">المواد</button>
-<button onclick="showTab('movement')">حركة المخزون</button>
-<button onclick="showTab('stock')">الأرصدة</button>
-</nav>
-<div id="message" class="msg">متصل بالنظام</div>
-</div>
+    <section id="stockPage" class="card hidden">
+      <h2>أرصدة المخازن</h2>
+      <select id="stockWarehouse" onchange="loadStock()"></select>
+      <button onclick="loadStock()">عرض الرصيد</button>
+      <div class="table-wrap" id="stockTable"></div>
+    </section>
 
-<div id="products" class="card">
-<h2>إضافة مادة جديدة</h2>
-<label>اسم المادة</label>
-<input id="pname" placeholder="مثال: فرينة">
-<label>الباركود</label>
-<input id="pbarcode" placeholder="الباركود">
-<label>وحدة القياس</label>
-<input id="punit" placeholder="كغ أو لتر أو قطعة">
-<label>الحد الأدنى للمخزون</label>
-<input id="pmin" type="number" min="0" value="0">
-<button onclick="addProduct()">حفظ المادة</button>
-<h2>قائمة المواد</h2>
-<div id="productList">جار التحميل...</div>
-</div>
+    <section id="productsPage" class="card hidden">
+      <h2>المواد</h2>
+      <div id="addProductBox">
+        <input id="newProductName" placeholder="اسم المادة">
+        <input id="newProductBarcode" placeholder="الباركود (اختياري)">
+        <input id="newProductUnit" placeholder="الوحدة، مثال: كغ">
+        <input id="newProductCategory" placeholder="الصنف">
+        <button onclick="addProduct()">إضافة مادة</button>
+      </div>
+      <div class="table-wrap" id="productsTable"></div>
+    </section>
 
-<div id="movement" class="card hidden">
-<h2>تسجيل حركة مخزون</h2>
-<label>المادة</label>
-<select id="productSelect"></select>
-<label>المخزن</label>
-<select id="warehouseSelect"></select>
-<label>نوع الحركة</label>
-<select id="movementType">
-<option value="in">دخول إلى المخزن</option>
-<option value="out">خروج من المخزن</option>
-</select>
-<label>الكمية</label>
-<input id="quantity" type="number" min="0.001" step="0.001">
-<label>ملاحظة أو رقم الفاتورة</label>
-<input id="notes" placeholder="اختياري">
-<button onclick="saveMovement()">حفظ الحركة</button>
-</div>
+    <section id="movementsPage" class="card hidden">
+      <h2>حركات المخزون</h2>
+      <div id="movementForm">
+        <select id="movementWarehouse"></select>
+        <select id="movementProduct"></select>
+        <select id="movementType">
+          <option value="in">إدخال</option>
+          <option value="out">إخراج</option>
+        </select>
+        <input id="movementQuantity" type="number" min="0.001" step="0.001" placeholder="الكمية">
+        <input id="movementNote" placeholder="ملاحظات">
+        <button onclick="addMovement()">حفظ الحركة</button>
+      </div>
+      <div class="table-wrap" id="movementsTable"></div>
+    </section>
 
-<div id="stock" class="card hidden">
-<h2>أرصدة المخازن</h2>
-<button class="secondary" onclick="loadStock()">تحديث الأرصدة</button>
-<div id="stockList">اضغط تحديث.</div>
-</div>
-<div class="card small">
-نسخة أولية للاختبار. لا تعتمد الأرصدة رسمياً قبل مراجعة جميع الحركات والصلاحيات.
-</div>
-</section>
+    <section id="transfersPage" class="card hidden">
+      <h2>التحويلات بين المخازن</h2>
+
+      <div id="createTransferBox">
+        <h3>إنشاء تحويل جديد</h3>
+        <label>المخزن المصدر</label>
+        <select id="transferFrom"></select>
+        <label>المخزن المستلم</label>
+        <select id="transferTo"></select>
+        <label>المادة</label>
+        <select id="transferProduct"></select>
+        <label>الكمية</label>
+        <input id="transferQuantity" type="number" min="0.001" step="0.001" placeholder="الكمية">
+        <label>ملاحظات</label>
+        <input id="transferNotes" placeholder="ملاحظات التحويل">
+        <button onclick="createTransfer()">إنشاء التحويل</button>
+      </div>
+
+      <hr>
+      <button onclick="loadTransfers()">تحديث التحويلات</button>
+      <div class="table-wrap" id="transfersTable"></div>
+      <div id="receiptBox" class="hidden">
+        <h3>تأكيد استلام مادة</h3>
+        <input id="receiptItemId" type="hidden">
+        <input id="receiptQuantity" type="number" min="0.001" step="0.001" placeholder="الكمية المستلمة">
+        <input id="receiptNotes" placeholder="ملاحظات الاستلام">
+        <button onclick="recordReceipt()">تسجيل الاستلام</button>
+        <button class="secondary" onclick="hideReceipt()">إلغاء</button>
+      </div>
+    </section>
+  </section>
 </main>
 
 <script>
-const SUPABASE_URL="https://ogpvudhotuhthywxrakm.supabase.co";
-const SUPABASE_KEY="sb_publishable_I4Co1ZEybYARgdWyQae3Gg_164EsQ8h";
-const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const SUPABASE_URL = 'https://ogpvudhotuhthywxrakm.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_I4Co1ZEybYARgdWyQae3Gg_164EsQ8h';
+const COMPANY_ID = 'db75bd1a-f1d1-4363-9820-95d85271421d';
+const CENTRAL_WAREHOUSE_ID = '1449658a-a1ac-4471-9ca3-7d84481d17b0';
 
-let profile=null,products=[],warehouses=[];
-let recoveryMode=false;
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-function el(id){return document.getElementById(id)}
-function safe(v){
- return String(v??"").replace(/[&<>"']/g,c=>({
- "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
- }[c]));
+let profile = null;
+let warehouses = [];
+let products = [];
+let movements = [];
+let transfers = [];
+let transferItems = [];
+
+const $ = id => document.getElementById(id);
+const msg = (id, text) => { $(id).textContent = text; };
+
+function canManageTransfers(){
+  return ['owner','admin'].includes(profile?.role);
 }
-function message(t,error=false){
- el("message").textContent=t;
- el("message").className=error?"msg error":"msg";
+function canManualMovement(){
+  return ['owner','admin','manager','storekeeper'].includes(profile?.role);
 }
-function showOnly(id){
- ["login","recovery","newPassword","application"].forEach(x=>el(x).classList.add("hidden"));
- el(id).classList.remove("hidden");
+function isBranchManager(){
+  return profile?.role === 'branch_manager';
 }
-function showLogin(){showOnly("login")}
-function showRecovery(){
- el("recoveryEmail").value=el("email").value;
- el("recoveryMsg").textContent="";
- showOnly("recovery");
+function moneyNumber(v){
+  return Number(v || 0).toLocaleString('ar-TN');
 }
-function showTab(id){
- ["products","movement","stock"].forEach(x=>el(x).classList.add("hidden"));
- el(id).classList.remove("hidden");
+function escapeHTML(value){
+  return String(value ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
 }
 
 async function login(){
- el("loginMsg").textContent="جار التحقق...";
- const {error}=await db.auth.signInWithPassword({
-  email:el("email").value.trim(),
-  password:el("password").value
- });
- if(error){
-  el("loginMsg").textContent="تعذر الدخول: "+error.message;
-  el("loginMsg").className="msg error";
-  return;
- }
- await startApp();
+  msg('loginMessage','جار تسجيل الدخول...');
+  const {data,error} = await db.auth.signInWithPassword({
+    email:$('email').value.trim(),
+    password:$('password').value
+  });
+  if(error){msg('loginMessage',error.message);return;}
+  await startApp(data.user);
 }
 
-async function sendRecovery(){
- const email=el("recoveryEmail").value.trim();
- if(!email){el("recoveryMsg").textContent="أدخل البريد الإلكتروني.";return}
- el("recoveryMsg").textContent="جار إرسال الرابط...";
- const {error}=await db.auth.resetPasswordForEmail(email,{
-  redirectTo:location.origin
- });
- el("recoveryMsg").textContent=error?
- "تعذر الإرسال: "+error.message:
- "تم طلب إرسال رابط الاستعادة. تحقق من بريدك الإلكتروني.";
-}
-
-async function updatePassword(){
- const p=el("newPass").value;
- const c=el("confirmPass").value;
- if(p.length<8){el("newPassMsg").textContent="كلمة المرور يجب أن تكون 8 أحرف على الأقل.";return}
- if(p!==c){el("newPassMsg").textContent="كلمتا المرور غير متطابقتين.";return}
- el("newPassMsg").textContent="جار حفظ كلمة المرور...";
- const {error}=await db.auth.updateUser({password:p});
- if(error){
-  el("newPassMsg").textContent="تعذر تغيير كلمة المرور: "+error.message;
-  return;
- }
- recoveryMode=false;
- el("newPassMsg").textContent="تم تغيير كلمة المرور. يمكنك تسجيل الدخول الآن.";
- await db.auth.signOut();
- setTimeout(showLogin,1200);
+async function resetPassword(){
+  const email = $('email').value.trim();
+  if(!email){msg('loginMessage','أدخل البريد الإلكتروني أولاً');return;}
+  const {error} = await db.auth.resetPasswordForEmail(email,{
+    redirectTo:location.origin+location.pathname
+  });
+  msg('loginMessage',error ? error.message : 'تم إرسال رابط استرجاع كلمة المرور إلى بريدك الإلكتروني');
 }
 
 async function logout(){
- await db.auth.signOut();
- location.reload();
+  await db.auth.signOut();
+  location.reload();
 }
 
-async function startApp(){
- showOnly("application");
- const {data:{user}}=await db.auth.getUser();
- if(!user){showLogin();return}
- const {data,error}=await db.from("user_profiles")
-  .select("*").eq("user_id",user.id).single();
- if(error){
-  message("تعذر قراءة ملف المستخدم: "+error.message,true);
-  return;
- }
- profile=data;
- el("welcome").textContent=profile.full_name||"مرحباً بك";
- const {data:co}=await db.from("companies")
-  .select("name").eq("id",profile.company_id).maybeSingle();
- el("company").textContent=co?.name||"";
- await loadData();
+async function startApp(user){
+  const {data,error} = await db.from('user_profiles')
+    .select('*').eq('user_id',user.id).single();
+
+  if(error || !data){
+    msg('loginMessage','تعذر العثور على ملف المستخدم في user_profiles');
+    return;
+  }
+  if(data.company_id !== COMPANY_ID){
+    msg('loginMessage','هذا الحساب لا ينتمي إلى شركة البركة');
+    return;
+  }
+
+  profile = data;
+  $('loginSection').classList.add('hidden');
+  $('appSection').classList.remove('hidden');
+  $('userName').textContent = data.full_name || user.email;
+  $('userRole').textContent = 'الصلاحية: ' + data.role;
+
+  if(!canManageTransfers()) $('createTransferBox').classList.add('hidden');
+  if(!canManualMovement()) $('movementForm').classList.add('hidden');
+  if(isBranchManager()) $('addProductBox').classList.add('hidden');
+
+  await loadBaseData();
+  await refreshAll();
 }
 
-async function loadData(){
- const [p,w]=await Promise.all([
-  db.from("products").select("*").eq("company_id",profile.company_id).order("name"),
-  db.from("warehouses").select("*").eq("company_id",profile.company_id).order("name")
- ]);
- if(p.error||w.error){
-  message("خطأ في تحميل البيانات: "+(p.error?.message||w.error?.message),true);
-  return;
- }
- products=p.data||[];
- warehouses=w.data||[];
- renderProducts();
- fillLists();
- message("اتصال ناجح. المواد: "+products.length+" — المخازن: "+warehouses.length);
+async function loadBaseData(){
+  let wq = db.from('warehouses').select('*').eq('company_id',COMPANY_ID);
+  if(isBranchManager()) wq = wq.eq('id',profile.warehouse_id);
+
+  const [wr,pr] = await Promise.all([
+    wq.order('name'),
+    db.from('products').select('*').eq('company_id',COMPANY_ID).eq('active',true).order('name')
+  ]);
+
+  if(wr.error) throw wr.error;
+  if(pr.error) throw pr.error;
+
+  warehouses = wr.data || [];
+  products = pr.data || [];
+
+  fillSelect('stockWarehouse',warehouses);
+  fillSelect('movementWarehouse',warehouses);
+  fillSelect('transferFrom',warehouses.filter(w=>w.warehouse_type==='central'));
+  fillSelect('transferTo',warehouses.filter(w=>w.warehouse_type==='branch'));
+  fillProductSelects();
 }
 
-function renderProducts(){
- if(!products.length){el("productList").textContent="لا توجد مواد مسجلة.";return}
- el("productList").innerHTML="<table><tr><th>المادة</th><th>الباركود</th><th>الوحدة</th></tr>"+
- products.map(p=>"<tr><td>"+safe(p.name)+"</td><td>"+safe(p.barcode||"—")+
- "</td><td>"+safe(p.unit||"—")+"</td></tr>").join("")+"</table>";
+function fillSelect(id,items){
+  const el=$(id);
+  if(!el)return;
+  el.innerHTML='<option value="">اختر المخزن</option>';
+  items.forEach(item=>{
+    el.add(new Option(item.name,item.id));
+  });
 }
-function fillLists(){
- el("productSelect").innerHTML=products.map(p=>
-  "<option value='"+safe(p.id)+"'>"+safe(p.name)+"</option>").join("");
- el("warehouseSelect").innerHTML=warehouses.map(w=>
-  "<option value='"+safe(w.id)+"'>"+safe(w.name)+"</option>").join("");
-}
-
-async function addProduct(){
- const name=el("pname").value.trim();
- if(!name){message("اكتب اسم المادة أولاً.",true);return}
- const payload={
-  company_id:profile.company_id,
-  name,
-  barcode:el("pbarcode").value.trim()||null,
-  unit:el("punit").value.trim()||null,
-  minimum_stock:Number(el("pmin").value||0)
- };
- const {error}=await db.from("products").insert(payload);
- if(error){message("لم يتم حفظ المادة: "+error.message,true);return}
- el("pname").value="";
- el("pbarcode").value="";
- el("punit").value="";
- el("pmin").value="0";
- await loadData();
- message("تم حفظ المادة بنجاح.");
+function fillProductSelects(){
+  ['movementProduct','transferProduct'].forEach(id=>{
+    const el=$(id);
+    if(!el)return;
+    el.innerHTML='<option value="">اختر المادة</option>';
+    products.forEach(p=>el.add(new Option(p.name,p.id)));
+  });
 }
 
-async function saveMovement(){
- const product_id=el("productSelect").value;
- const warehouse_id=el("warehouseSelect").value;
- const quantity=Number(el("quantity").value);
- if(!product_id||!warehouse_id||quantity<=0){
-  message("اختر المادة والمخزن وأدخل كمية صحيحة.",true);return;
- }
- const {data:{user}}=await db.auth.getUser();
- const payload={
-  company_id:profile.company_id,
-  product_id,warehouse_id,
-  movement_type:el("movementType").value,
-  quantity,
-  notes:el("notes").value.trim()||null,
-  user_id:user.id
- };
- const {error}=await db.from("stock_movements").insert(payload);
- if(error){message("تعذر تسجيل الحركة: "+error.message,true);return}
- el("quantity").value="";
- el("notes").value="";
- message("تم تسجيل الحركة.");
+async function refreshAll(){
+  try{
+    await Promise.all([loadStock(),loadProducts(),loadMovements(),loadTransfers()]);
+    msg('dashboardInfo','تم تحديث بيانات النظام');
+  }catch(e){
+    msg('dashboardInfo','خطأ: '+e.message);
+  }
+}
+
+function showPage(page){
+  ['dashboard','stock','products','movements','transfers'].forEach(p=>{
+    $(p+'Page').classList.toggle('hidden',p!==page);
+  });
+  if(page==='stock')loadStock();
+  if(page==='products')loadProducts();
+  if(page==='movements')loadMovements();
+  if(page==='transfers')loadTransfers();
 }
 
 async function loadStock(){
- el("stockList").textContent="جار تحميل الحركات...";
- const {data,error}=await db.from("stock_movements")
-  .select("product_id,warehouse_id,movement_type,quantity,created_at")
-  .eq("company_id",profile.company_id)
-  .order("created_at",{ascending:true}).limit(1000);
- if(error){el("stockList").textContent="خطأ: "+error.message;return}
- const totals={};
- (data||[]).forEach(m=>{
-  const k=m.product_id+"|"+m.warehouse_id;
-  if(totals[k]===undefined)totals[k]=0;
-  const q=Number(m.quantity)||0;
-  totals[k]+=m.movement_type==="out"?-q:q;
- });
- const pn=Object.fromEntries(products.map(p=>[p.id,p.name]));
- const wn=Object.fromEntries(warehouses.map(w=>[w.id,w.name]));
- const rows=Object.entries(totals).map(([k,v])=>{
-  const [p,w]=k.split("|");
-  return "<tr><td>"+safe(pn[p]||p)+"</td><td>"+safe(wn[w]||w)+
-  "</td><td>"+v.toFixed(3)+"</td></tr>";
- });
- el("stockList").innerHTML=rows.length?
-  "<table><tr><th>المادة</th><th>المخزن</th><th>الرصيد</th></tr>"+rows.join("")+"</table>"+
-  "<p class='small'>ملخص آخر 1000 حركة فقط، وليس رصيداً نهائياً معتمداً.</p>":
-  "لا توجد حركات مخزون.";
+  const warehouseId=$('stockWarehouse').value;
+  if(!warehouseId){$('stockTable').innerHTML='اختر المخزن';return;}
+
+  const {data,error}=await db.from('stock_movements')
+    .select('product_id,movement_type,quantity,created_at')
+    .eq('company_id',COMPANY_ID)
+    .eq('warehouse_id',warehouseId)
+    .order('created_at',{ascending:false})
+    .limit(1000);
+
+  if(error){$('stockTable').textContent=error.message;return;}
+
+  const totals={};
+  (data||[]).forEach(m=>{
+    totals[m.product_id]=(totals[m.product_id]||0)+
+      (m.movement_type==='in'?Number(m.quantity):-Number(m.quantity));
+  });
+
+  let html='<table><thead><tr><th>المادة</th><th>الرصيد</th></tr></thead><tbody>';
+  products.forEach(p=>{
+    html+=`<tr><td>${escapeHTML(p.name)}</td><td>${moneyNumber(totals[p.id]||0)}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  $('stockTable').innerHTML=html;
 }
 
-db.auth.onAuthStateChange((event,session)=>{
- if(event==="PASSWORD_RECOVERY"){
-  recoveryMode=true;
-  setTimeout(()=>showOnly("newPassword"),0);
- }
+async function loadProducts(){
+  const {data,error}=await db.from('products')
+    .select('*').eq('company_id',COMPANY_ID).order('name');
+  if(error){$('productsTable').textContent=error.message;return;}
+  products=data||[];
+  fillProductSelects();
+
+  let html='<table><thead><tr><th>المادة</th><th>الوحدة</th><th>الباركود</th></tr></thead><tbody>';
+  products.forEach(p=>{
+    html+=`<tr><td>${escapeHTML(p.name)}</td><td>${escapeHTML(p.unit||'')}</td><td>${escapeHTML(p.barcode||'')}</td></tr>`;
+  });
+  $('productsTable').innerHTML=html+'</tbody></table>';
+}
+
+async function addProduct(){
+  if(!canManageTransfers())return alert('ليس لديك صلاحية إضافة المواد');
+  const name=$('newProductName').value.trim();
+  if(!name)return alert('أدخل اسم المادة');
+
+  const {error}=await db.from('products').insert({
+    company_id:COMPANY_ID,
+    name,
+    barcode:$('newProductBarcode').value.trim()||null,
+    unit:$('newProductUnit').value.trim()||null,
+    category:$('newProductCategory').value.trim()||null,
+    active:true
+  });
+  if(error)return alert(error.message);
+
+  $('newProductName').value='';
+  $('newProductBarcode').value='';
+  $('newProductUnit').value='';
+  $('newProductCategory').value='';
+  await loadProducts();
+  alert('تمت إضافة المادة');
+}
+
+async function loadMovements(){
+  let q=db.from('stock_movements').select('*')
+    .eq('company_id',COMPANY_ID)
+    .order('created_at',{ascending:false}).limit(100);
+
+  if(isBranchManager())q=q.eq('warehouse_id',profile.warehouse_id);
+
+  const {data,error}=await q;
+  if(error){$('movementsTable').textContent=error.message;return;}
+  movements=data||[];
+
+  let html='<table><thead><tr><th>التاريخ</th><th>المادة</th><th>النوع</th><th>الكمية</th></tr></thead><tbody>';
+  movements.forEach(m=>{
+    const p=products.find(x=>x.id===m.product_id);
+    html+=`<tr><td>${m.created_at?new Date(m.created_at).toLocaleString('ar-TN'):''}</td>
+      <td>${escapeHTML(p?.name||'')}</td>
+      <td>${m.movement_type==='in'?'إدخال':'إخراج'}</td>
+      <td>${moneyNumber(m.quantity)}</td></tr>`;
+  });
+  $('movementsTable').innerHTML=html+'</tbody></table>';
+}
+
+async function addMovement(){
+  if(!canManualMovement())return alert('ليست لديك صلاحية');
+  const warehouseId=$('movementWarehouse').value;
+  const productId=$('movementProduct').value;
+  const quantity=Number($('movementQuantity').value);
+  const type=$('movementType').value;
+
+  if(!warehouseId||!productId||quantity<=0)return alert('تحقق من البيانات');
+
+  const {error}=await db.from('stock_movements').insert({
+    company_id:COMPANY_ID,
+    warehouse_id:warehouseId,
+    product_id:productId,
+    movement_type:type,
+    quantity,
+    note:$('movementNote').value.trim(),
+    created_by:(await db.auth.getUser()).data.user.id
+  });
+  if(error)return alert(error.message);
+
+  $('movementQuantity').value='';
+  $('movementNote').value='';
+  await loadMovements();
+  await loadStock();
+  alert('تم تسجيل الحركة');
+}
+
+async function createTransfer(){
+  if(!canManageTransfers())return alert('ليس لديك صلاحية إنشاء تحويل');
+
+  const from=$('transferFrom').value;
+  const to=$('transferTo').value;
+  const product=$('transferProduct').value;
+  const quantity=Number($('transferQuantity').value);
+
+  if(!from||!to||!product||quantity<=0)return alert('أكمل بيانات التحويل');
+  if(from===to)return alert('لا يمكن التحويل إلى المخزن نفسه');
+
+  const user=(await db.auth.getUser()).data.user;
+  if(!user)return alert('انتهت جلسة الدخول');
+
+  const {data:transfer,error:transferError}=await db.from('stock_transfers')
+    .insert({
+      company_id:COMPANY_ID,
+      from_warehouse_id:from,
+      to_warehouse_id:to,
+      status:'draft',
+      notes:$('transferNotes').value.trim(),
+      created_by:user.id
+    }).select().single();
+
+  if(transferError)return alert(transferError.message);
+
+  const {error:itemError}=await db.from('stock_transfer_items').insert({
+    transfer_id:transfer.id,
+    product_id:product,
+    sent_quantity:quantity
+  });
+
+  if(itemError){
+    alert('تم إنشاء مسودة التحويل لكن تعذرت إضافة المادة: '+itemError.message);
+    return;
+  }
+
+  $('transferQuantity').value='';
+  $('transferNotes').value='';
+  await loadTransfers();
+  alert('تم إنشاء مسودة التحويل. اضغط إرسال بعد مراجعتها.');
+}
+
+async function loadTransfers(){
+  const {data,error}=await db.from('stock_transfers')
+    .select('*').eq('company_id',COMPANY_ID)
+    .order('created_at',{ascending:false}).limit(100);
+
+  if(error){$('transfersTable').textContent=error.message;return;}
+  transfers=data||[];
+
+  const ids=transfers.map(t=>t.id);
+  transferItems=[];
+  if(ids.length){
+    const r=await db.from('stock_transfer_items')
+      .select('*').in('transfer_id',ids);
+    if(r.error){$('transfersTable').textContent=r.error.message;return;}
+    transferItems=r.data||[];
+  }
+
+  let html='<table><thead><tr><th>رقم</th><th>الحالة</th><th>التفاصيل</th><th>الإجراء</th></tr></thead><tbody>';
+
+  for(const t of transfers){
+    const from=warehouses.find(w=>w.id===t.from_warehouse_id)?.name||'';
+    const to=warehouses.find(w=>w.id===t.to_warehouse_id)?.name||'';
+    const items=transferItems.filter(i=>i.transfer_id===t.id);
+    const details=items.map(i=>{
+      const p=products.find(x=>x.id===i.product_id);
+      return `${escapeHTML(p?.name||'مادة')}: ${moneyNumber(i.sent_quantity)} (مستلم ${moneyNumber(i.received_quantity)})`;
+    }).join('<br>');
+
+    let actions='';
+    if(canManageTransfers()&&t.status==='draft'){
+      actions=`<button onclick="sendTransfer('${t.id}')">إرسال التحويل</button>`;
+    }
+    if((canManageTransfers()||isBranchManager())&&['sent','partial'].includes(t.status)){
+      actions+=`<button onclick="openTransferReceipt('${t.id}')">استلام / مراجعة</button>`;
+      actions+=`<button class="secondary" onclick="finalizeTransfer('${t.id}')">إغلاق التحويل</button>`;
+    }
+
+    html+=`<tr>
+      <td>${escapeHTML(t.transfer_number||t.id.slice(0,8))}</td>
+      <td>${escapeHTML(t.status)}</td>
+      <td>${escapeHTML(from)} ← ${escapeHTML(to)}<br>${details}</td>
+      <td>${actions||'—'}</td>
+    </tr>`;
+  }
+  $('transfersTable').innerHTML=html+'</tbody></table>';
+}
+
+async function sendTransfer(id){
+  if(!canManageTransfers())return alert('ليس لديك صلاحية');
+  if(!confirm('هل تريد إرسال هذا التحويل وخصم الكمية من المخزن المركزي؟'))return;
+
+  const {error}=await db.rpc('send_stock_transfer',{p_transfer_id:id});
+  if(error)return alert(error.message);
+
+  await loadTransfers();
+  await loadStock();
+  alert('تم إرسال التحويل');
+}
+
+function openTransferReceipt(transferId){
+  const t=transfers.find(x=>x.id===transferId);
+  if(!t)return;
+  if(isBranchManager()&&t.to_warehouse_id!==profile.warehouse_id){
+    return alert('هذا التحويل ليس موجهاً إلى مخزنك');
+  }
+
+  const item=transferItems.find(i=>i.transfer_id===transferId &&
+    Number(i.received_quantity||0)<Number(i.sent_quantity));
+
+  if(!item)return alert('لا توجد مادة متبقية للاستلام');
+
+  $('receiptItemId').value=item.id;
+  $('receiptQuantity').value='';
+  $('receiptNotes').value='';
+  $('receiptBox').classList.remove('hidden');
+  $('receiptBox').dataset.transferId=transferId;
+}
+
+function hideReceipt(){
+  $('receiptBox').classList.add('hidden');
+}
+
+async function recordReceipt(){
+  const itemId=$('receiptItemId').value;
+  const quantity=Number($('receiptQuantity').value);
+  const notes=$('receiptNotes').value.trim();
+
+  if(!itemId||quantity<=0)return alert('أدخل كمية صحيحة');
+
+  const {error}=await db.rpc('record_transfer_receipt',{
+    p_transfer_item_id:itemId,
+    p_received_quantity:quantity,
+    p_notes:notes
+  });
+
+  if(error)return alert(error.message);
+
+  hideReceipt();
+  await loadTransfers();
+  await loadMovements();
+  await loadStock();
+  alert('تم تسجيل الاستلام');
+}
+
+async function finalizeTransfer(id){
+  if(!confirm('هل تؤكد إغلاق التحويل نهائياً؟ سيتم تثبيت الكميات والفروقات.'))return;
+
+  const {error}=await db.rpc('finalize_transfer_receipt',{p_transfer_id:id});
+  if(error)return alert(error.message);
+
+  await loadTransfers();
+  alert('تم إغلاق التحويل');
+}
+
+db.auth.getSession().then(async ({data})=>{
+  if(data.session)await startApp(data.session.user);
 });
 
-db.auth.getSession().then(({data})=>{
- if(data.session && !recoveryMode)startApp();
+db.auth.onAuthStateChange(async (event,session)=>{
+  if(event==='PASSWORD_RECOVERY'){
+    const newPassword=prompt('أدخل كلمة المرور الجديدة');
+    if(newPassword){
+      const {error}=await db.auth.updateUser({password:newPassword});
+      alert(error?error.message:'تم تغيير كلمة المرور');
+    }
+  }
 });
 </script>
 </body>
